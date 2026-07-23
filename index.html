@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart AI-Based Livestock Monitoring and Animal Classification System with Gender Detection</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+    <!-- TensorFlow.js and MobileNet -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="logo-area">
+                <i class="fa-solid fa-cow brand-icon"></i>
+                <div class="logo-text">
+                    <h2>SMART LIVESTOCK AI</h2>
+                    <span>Gender & Breed AI Monitor</span>
+                </div>
+            </div>
+            
+            <nav class="nav-menu">
+                <button class="nav-item active" data-tab="dashboard">
+                    <i class="fa-solid fa-chart-pie"></i> Dashboard & Scanner
+                </button>
+                <button class="nav-item" data-tab="history">
+                    <i class="fa-solid fa-history"></i> Scan History
+                </button>
+                <button class="nav-item" data-tab="comparison">
+                    <i class="fa-solid fa-book-open"></i> Identification Guide
+                </button>
+                <button class="nav-item" data-tab="settings">
+                    <i class="fa-solid fa-sliders"></i> Configuration
+                </button>
+            </nav>
+
+            <div class="model-status-card">
+                <div class="status-header">
+                    <span class="status-dot pulsing" id="model-status-dot"></span>
+                    <span class="status-label" id="model-status-text">Loading TF.js Engine...</span>
+                </div>
+                <p class="status-desc">CNN MobileNetV2 architecture is used for localized classification.</p>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="model-progress" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <p>v1.0.0 (Production Model)</p>
+                <p>&copy; 2026 Smart Livestock AI Corp</p>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-title">
+                    <h1 id="page-title">Dashboard & Scanner</h1>
+                    <p class="subtitle" id="page-subtitle">Upload or capture an image to identify livestock species instantly</p>
+                </div>
+                <div class="user-profile" style="display: flex; gap: 0.75rem; align-items: center;">
+                    <div class="lang-selector-wrap" style="position: relative; display: flex; align-items: center;">
+                        <i class="fa-solid fa-language" style="position: absolute; left: 10px; color: var(--accent-buffalo); pointer-events: none; z-index: 1;"></i>
+                        <select id="app-lang-select" class="form-select" style="padding: 0.4rem 1.75rem 0.4rem 2rem; border-radius: 8px; font-size: 0.8rem; height: 100%; border: 1px solid var(--border-color); background-color: rgba(255,255,255,0.04); color: var(--text-primary); cursor: pointer; outline: none; appearance: none; -webkit-appearance: none;">
+                            <option value="en" style="background: var(--bg-sidebar); color: #fff;">English</option>
+                            <option value="hi" style="background: var(--bg-sidebar); color: #fff;">हिंदी (Hindi)</option>
+                            <option value="ta" style="background: var(--bg-sidebar); color: #fff;">தமிழ் (Tamil)</option>
+                            <option value="te" style="background: var(--bg-sidebar); color: #fff;">తెలుగు (Telugu)</option>
+                            <option value="kn" style="background: var(--bg-sidebar); color: #fff;">ಕನ್ನಡ (Kannada)</option>
+                            <option value="ml" style="background: var(--bg-sidebar); color: #fff;">മലയാളം (Malayalam)</option>
+                            <option value="mr" style="background: var(--bg-sidebar); color: #fff;">मराठी (Marathi)</option>
+                        </select>
+                        <i class="fa-solid fa-chevron-down" style="position: absolute; right: 10px; font-size: 0.7rem; color: var(--text-secondary); pointer-events: none;"></i>
+                    </div>
+                    <button class="btn btn-outline btn-small" id="btn-open-help">
+                        <i class="fa-solid fa-circle-question"></i> Help Guide
+                    </button>
+                    <div class="stats-badge">
+                        <i class="fa-solid fa-database"></i> <span id="total-scans-badge">0</span> Scans Done
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dashboard Tab Content -->
+            <section class="tab-content active" id="dashboard-tab">
+                <!-- Stats Summary Row -->
+                <div class="stats-row">
+                    <div class="stat-card">
+                        <div class="stat-icon-wrap bg-primary"><i class="fa-solid fa-calculator"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Total Scans Run</span>
+                            <h3 class="stat-value" id="stat-total-scans">0</h3>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon-wrap bg-cattle"><i class="fa-solid fa-chart-pie"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Cattle / Buffalo Ratio</span>
+                            <h3 class="stat-value" id="stat-ratio">0% / 0%</h3>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon-wrap bg-gold"><i class="fa-solid fa-gauge-high"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Average Confidence</span>
+                            <h3 class="stat-value" id="stat-avg-conf">0%</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid-layout">
+                    <!-- Left: Upload/Capture Panel -->
+                    <div class="card scan-card">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-camera"></i> Image Acquisition</h3>
+                            <div class="mode-selector">
+                                <button class="mode-btn active" id="btn-mode-upload"><i class="fa-solid fa-upload"></i> Upload File</button>
+                                <button class="mode-btn" id="btn-mode-camera"><i class="fa-solid fa-video"></i> Live Camera</button>
+                            </div>
+                        </div>
+                        
+                        <div class="card-body">
+                            <!-- File Upload Area -->
+                            <div class="upload-area" id="upload-zone">
+                                <input type="file" id="file-input" accept="image/*" class="file-input-hidden">
+                                <div class="upload-prompt">
+                                    <div class="icon-circle">
+                                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                                    </div>
+                                    <h4>Drag & Drop Livestock Image</h4>
+                                    <p>Supports JPG, PNG, WEBP up to 10MB</p>
+                                    <button class="btn btn-primary" id="btn-select-file">Browse Local Files</button>
+                                </div>
+                            </div>
+
+                            <!-- Live Webcam Capture Area -->
+                            <div class="camera-area hidden" id="camera-zone">
+                                <div class="video-container" style="position: relative;">
+                                    <video id="webcam" autoplay playsinline muted></video>
+                                    <canvas id="camera-overlay-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10;"></canvas>
+                                    <div class="camera-overlay">
+                                        <div class="target-box"></div>
+                                        <div class="scan-line"></div>
+                                    </div>
+                                    <div class="camera-error-msg hidden" id="camera-error">
+                                        <i class="fa-solid fa-triangle-exclamation"></i>
+                                        <p>Failed to access webcam. Please check permissions.</p>
+                                    </div>
+                                </div>
+                                <div class="camera-controls" style="display: flex; flex-direction: column; gap: 1rem; width: 100%; align-items: center;">
+                                    <div style="display: flex; gap: 1rem; width: 100%; justify-content: center;">
+                                        <button class="btn btn-secondary" id="btn-close-camera"><i class="fa-solid fa-ban"></i> Cancel</button>
+                                        <button class="btn btn-accent" id="btn-capture"><i class="fa-solid fa-circle-dot"></i> Capture Photo</button>
+                                    </div>
+                                    <label class="checkbox-container" style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                        <input type="checkbox" id="chk-continuous-scan">
+                                        <span class="checkmark"></span>
+                                        Enable Continuous Real-Time Scanner (Auto-Detect)
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Sample Images Panel -->
+                            <div class="sample-images-section">
+                                <p class="label-heading">Quick Test with Demo Samples</p>
+                                <div class="sample-grid">
+                                    <div class="sample-item" data-type="cattle" data-src="sample_cattle.jpg">
+                                        <div class="sample-thumb cattle-thumb">
+                                            <i class="fa-solid fa-cow"></i>
+                                        </div>
+                                        <span>Cattle (Cow)</span>
+                                    </div>
+                                    <div class="sample-item" data-type="buffalo" data-src="sample_buffalo.jpg">
+                                        <div class="sample-thumb buffalo-thumb">
+                                            <i class="fa-solid fa-water"></i>
+                                        </div>
+                                        <span>Buffalo</span>
+                                    </div>
+                                    <div class="sample-item" data-type="cattle2" data-src="sample_cattle2.jpg">
+                                        <div class="sample-thumb cattle2-thumb">
+                                            <i class="fa-solid fa-bull"></i>
+                                        </div>
+                                        <span>Cattle (Bull)</span>
+                                    </div>
+                                    <div class="sample-item" data-type="buffalo2" data-src="sample_buffalo2.jpg">
+                                        <div class="sample-thumb buffalo2-thumb">
+                                            <i class="fa-solid fa-cloud"></i>
+                                        </div>
+                                        <span>Water Buffalo</span>
+                                    </div>
+                                    <div class="sample-item" data-type="human" data-src="sample_human.jpg">
+                                        <div class="sample-thumb human-thumb">
+                                            <i class="fa-solid fa-user"></i>
+                                        </div>
+                                        <span>Human (Other)</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: AI Inference & Detailed Results Panel -->
+                    <div class="card results-card">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-brain"></i> AI Classification Output</h3>
+                            <button class="btn btn-small btn-outline hidden" id="btn-save-report"><i class="fa-solid fa-floppy-disk"></i> Save Scan</button>
+                        </div>
+                        
+                        <div class="card-body">
+                            <!-- Idle State -->
+                            <div class="idle-results-state" id="results-idle">
+                                <div class="ai-orb">
+                                    <div class="orb-inner"></div>
+                                </div>
+                                <h4>Awaiting Input Image</h4>
+                                <p>Provide an image via file upload or live camera scan to run the convolutional neural network classification engine.</p>
+                            </div>
+
+                            <!-- Processing State -->
+                            <div class="processing-state hidden" id="results-loading">
+                                <div class="scanner-spinner"></div>
+                                <h4>Executing CNN Inference...</h4>
+                                <p>Extracting body shape, horn structure, and skin texture features.</p>
+                            </div>
+
+                            <!-- Results Active State -->
+                            <div class="active-results-state hidden" id="results-active">
+                                <div class="classification-badge-container">
+                                    <div class="main-badge" id="result-badge">
+                                        <i class="fa-solid fa-cow badge-icon" id="result-icon"></i>
+                                        <div class="badge-text">
+                                            <span class="label">CLASSIFICATION</span>
+                                            <h2 id="result-class-name">Cattle (Cow/Bull)</h2>
+                                        </div>
+                                    </div>
+                                    <div class="confidence-circle-wrap">
+                                        <svg class="progress-ring" width="80" height="80">
+                                            <circle class="progress-ring__background" stroke="rgba(255,255,255,0.1)" stroke-width="6" fill="transparent" r="34" cx="40" cy="40"/>
+                                            <circle class="progress-ring__circle" id="result-confidence-ring" stroke="#10B981" stroke-width="6" fill="transparent" r="34" cx="40" cy="40" stroke-dasharray="213.628" stroke-dashoffset="213.628"/>
+                                        </svg>
+                                        <div class="confidence-percent-text" id="result-confidence-text">98%</div>
+                                    </div>
+                                </div>
+
+                                <!-- Image Analysis Canvas -->
+                                <div class="visual-analysis-container">
+                                    <div class="canvas-title">
+                                        <span>Feature Map Overlay (Simulated Detection)</span>
+                                        <span class="legend-badge"><span class="legend-color rgb-horns"></span> Horns</span>
+                                        <span class="legend-badge"><span class="legend-color rgb-face"></span> Facial</span>
+                                        <span class="legend-badge"><span class="legend-color rgb-body"></span> Body</span>
+                                    </div>
+                                    <div class="canvas-wrapper">
+                                        <canvas id="analysis-canvas"></canvas>
+                                        <img id="source-image-hidden" class="hidden" alt="Source">
+                                    </div>
+                                </div>
+
+                                <!-- Feature Extractors Breakdown -->
+                                <div class="features-breakdown">
+                                    <h4>Anatomical Feature Logits</h4>
+                                    
+                                    <div class="feature-bar-item">
+                                        <div class="feature-meta">
+                                            <span>Horn Curvature Index (Buffalo Sign)</span>
+                                            <span id="feature-val-horns">12%</span>
+                                        </div>
+                                        <div class="feature-track">
+                                            <div class="feature-fill" id="feature-bar-horns" style="width: 12%"></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="feature-bar-item">
+                                        <div class="feature-meta">
+                                            <span>Skin Color & Coarseness (Melanin Index)</span>
+                                            <span id="feature-val-skin">18%</span>
+                                        </div>
+                                        <div class="feature-track">
+                                            <div class="feature-fill" id="feature-bar-skin" style="width: 18%"></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="feature-bar-item">
+                                        <div class="feature-meta">
+                                            <span>Facial Profile & Forehead Slope</span>
+                                            <span id="feature-val-face">85%</span>
+                                        </div>
+                                        <div class="feature-track">
+                                            <div class="feature-fill" id="feature-bar-face" style="width: 85%"></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="feature-bar-item">
+                                        <div class="feature-meta">
+                                            <span>Body Mass to Shoulder Ratio</span>
+                                            <span id="feature-val-body">92%</span>
+                                        </div>
+                                        <div class="feature-track">
+                                            <div class="feature-fill" id="feature-bar-body" style="width: 92%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Model Meta & Future Enhancement simulation -->
+                                <div class="additional-insights">
+                                    <div class="insight-row">
+                                        <span><i class="fa-solid fa-cow text-primary"></i> Animal Type:</span>
+                                        <strong id="result-animal-type">Cattle</strong>
+                                    </div>
+                                    <div class="insight-row">
+                                        <span><i class="fa-solid fa-venus-mars text-primary"></i> Gender:</span>
+                                        <strong id="result-gender">Female</strong>
+                                    </div>
+                                    <div class="insight-row">
+                                        <span><i class="fa-solid fa-dna text-primary"></i> Breed Name:</span>
+                                        <strong id="result-breed">Gir Cattle</strong>
+                                    </div>
+                                    <div class="insight-row">
+                                        <span><i class="fa-solid fa-heart-pulse text-warning"></i> Health Status:</span>
+                                        <strong id="result-health">Healthy (Clean Coat)</strong>
+                                    </div>
+                                    <div class="insight-row">
+                                        <span><i class="fa-solid fa-calendar-day text-primary"></i> Estimated Age:</span>
+                                        <strong id="result-age">4.5 Years</strong>
+                                    </div>
+                                    <div class="insight-row">
+                                        <span><i class="fa-solid fa-weight-hanging text-primary"></i> Estimated Weight:</span>
+                                        <strong id="result-weight">480 kg</strong>
+                                    </div>
+                                    <div class="insight-row">
+                                        <span><i class="fa-solid fa-glass-water text-primary"></i> Expected Milk Production:</span>
+                                        <strong id="result-milk">18.5 Liters/Day</strong>
+                                    </div>
+                                    <div class="insight-row">
+                                        <span><i class="fa-solid fa-hashtag text-primary"></i> Total Animal Count:</span>
+                                        <strong id="result-animal-count">1 Animal</strong>
+                                    </div>
+                                </div>
+
+                                <!-- Feed Recommendations Block -->
+                                <div class="feed-recommendations-block" style="background: rgba(16, 185, 129, 0.04); border: 1px solid rgba(16, 185, 129, 0.15); border-radius: 12px; padding: 1rem; margin-top: 1rem;">
+                                    <h4 style="font-size: 0.85rem; font-family: var(--font-heading); color: var(--accent-cattle); text-transform: uppercase; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;"><i class="fa-solid fa-seedling"></i> Intelligent Feed Recommendation</h4>
+                                    <p id="result-feed-recommendation" style="font-size: 0.82rem; line-height: 1.45; color: var(--text-secondary); margin: 0;">Loading feed details...</p>
+                                </div>
+
+                                <!-- Detailed Information Cards (Tabs) -->
+                                <div class="insights-tabs-container">
+                                    <div class="insights-tab-header">
+                                        <button type="button" class="insight-tab-btn active" data-insight="species">Species Info</button>
+                                        <button type="button" class="insight-tab-btn" data-insight="breed">Breed Profile</button>
+                                        <button type="button" class="insight-tab-btn" data-insight="anatomy">AI Logits</button>
+                                    </div>
+                                    <div class="insights-tab-body">
+                                        <div class="insight-tab-pane active" id="pane-species">
+                                            <p id="insight-species-desc">Loading species profile...</p>
+                                        </div>
+                                        <div class="insight-tab-pane hidden" id="pane-breed">
+                                            <p id="insight-breed-desc">Loading breed characteristics...</p>
+                                        </div>
+                                        <div class="insight-tab-pane hidden" id="pane-anatomy">
+                                            <p id="insight-anatomy-desc">Loading anatomical logit parameters...</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="action-buttons">
+                                    <button class="btn btn-outline" id="btn-reset-scan"><i class="fa-solid fa-rotate-left"></i> Reset Scan</button>
+                                    <button class="btn btn-accent" id="btn-print-report"><i class="fa-solid fa-file-pdf"></i> Download PDF Report</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Scan History Tab Content -->
+            <section class="tab-content hidden" id="history-tab">
+                <div class="card history-card">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-clock-rotate-left"></i> Analysis Records</h3>
+                        <div class="header-actions">
+                            <input type="text" id="history-search" class="form-input" placeholder="Search by species or tag...">
+                            <button class="btn btn-outline btn-small" id="btn-clear-history"><i class="fa-solid fa-trash-can"></i> Clear All</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="history-table">
+                                <thead>
+                                    <tr>
+                                        <th>Animal Image</th>
+                                        <th>Date & Time</th>
+                                        <th>Classification</th>
+                                        <th>Confidence</th>
+                                        <th>Breed (Beta)</th>
+                                        <th>Health Indicator</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="history-table-body">
+                                    <!-- Dynamic rows loaded here -->
+                                    <tr class="empty-table-row">
+                                        <td colspan="7" class="text-center">No scans recorded yet. Perform classification in the Dashboard tab.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Identification Guide Tab Content -->
+            <section class="tab-content hidden" id="comparison-tab">
+                <div class="guide-grid">
+                    <!-- Intro Card -->
+                    <div class="card full-width">
+                        <div class="card-body guide-intro">
+                            <h2>Key Anatomical Markers: Cattle vs. Buffalo</h2>
+                            <p>Distinguishing cattle and buffaloes involves parsing specific morphological features. The deep CNN model looks at these specific region logs to weigh classification logits.</p>
+                        </div>
+                    </div>
+
+                    <!-- Comparison Card 1: Horns -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-circle-chevron-right text-accent"></i> Horn Structure</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="comparison-visuals">
+                                <div class="visual-box">
+                                    <span class="lbl-cattle">Cattle</span>
+                                    <p>Varying directions (upright, outward, or polled). Usually rounded cross-section. Slimmer taper.</p>
+                                </div>
+                                <div class="visual-box">
+                                    <span class="lbl-buffalo">Buffalo</span>
+                                    <p>Typically sweep backwards or curl inward. Flattened, triangular cross-section. Much thicker at base.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Comparison Card 2: Skin & Hair -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-circle-chevron-right text-accent"></i> Skin Texture & Hair</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="comparison-visuals">
+                                <div class="visual-box">
+                                    <span class="lbl-cattle">Cattle</span>
+                                    <p>Dense coat covering the body. Wide spectrum of colors (white, brown, black, patches). Fine skin texture.</p>
+                                </div>
+                                <div class="visual-box">
+                                    <span class="lbl-buffalo">Buffalo</span>
+                                    <p>Sparsely hair-covered, showing thick dark grey or black skin. High oil gland concentration for thermoregulation.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Comparison Card 3: Head & Facial Profiles -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-circle-chevron-right text-accent"></i> Head Profile</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="comparison-visuals">
+                                <div class="visual-box">
+                                    <span class="lbl-cattle">Cattle</span>
+                                    <p>Longer face with flat or concave forehead structure. Distinct muzzle lines with smaller ears.</p>
+                                </div>
+                                <div class="visual-box">
+                                    <span class="lbl-buffalo">Buffalo</span>
+                                    <p>Broader forehead (often convex) with a wider muzzle. Heavy, downward-hanging ears positioned below horns.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Comparison Card 4: Body Silhouette -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-circle-chevron-right text-accent"></i> Body Build</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="comparison-visuals">
+                                <div class="visual-box">
+                                    <span class="lbl-cattle">Cattle</span>
+                                    <p>Slightly leaner bone structure, taller leg-to-body ratio, distinct hump in Bos Indicus breeds.</p>
+                                </div>
+                                <div class="visual-box">
+                                    <span class="lbl-buffalo">Buffalo</span>
+                                    <p>Massive, low-slung torso, thick barrel chest, shorter and stockier legs. Flat spine line.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Configuration Tab Content -->
+            <section class="tab-content hidden" id="settings-tab">
+                <div class="card settings-card">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-sliders"></i> Classification Hyperparameters</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="settings-form">
+                            <div class="form-group">
+                                <label for="min-confidence-slider">Minimum Confidence Threshold: <span id="threshold-display">70%</span></label>
+                                <input type="range" id="min-confidence-slider" min="50" max="95" value="70" class="slider-input">
+                                <p class="help-text">Filters out predictions that fall below the selected probability score.</p>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="select-model-backend">Neural Network Engine</label>
+                                <select id="select-model-backend" class="form-select">
+                                    <option value="mobilenet">MobileNet V2 (Standard, client-side)</option>
+                                    <option value="fallback" selected>MobileNet V2 + Enhanced Heuristic Rule Engine (Recommended)</option>
+                                </select>
+                                <p class="help-text">Controls how predictions are processed. The heuristic ruleset maps generic bovine tags to specific species and calculates anatomical indices.</p>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="checkbox-container">
+                                    <input type="checkbox" id="chk-auto-save" checked>
+                                    <span class="checkmark"></span>
+                                    Auto-save successful scans to History
+                                </label>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="checkbox-container">
+                                    <input type="checkbox" id="chk-feature-overlay" checked>
+                                    <span class="checkmark"></span>
+                                    Enable dynamic visual canvas bounding boxes
+                                </label>
+                            </div>
+
+                            <div class="action-buttons text-right">
+                                <button class="btn btn-primary" id="btn-save-settings"><i class="fa-solid fa-check"></i> Apply Configuration</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast hidden">
+        <i class="fa-solid fa-circle-check" id="toast-icon"></i>
+        <span id="toast-message">Settings applied successfully.</span>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-circle-question"></i> Smart Livestock AI Quick Start Guide</h3>
+                <button class="modal-close" id="btn-close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="step-guide">
+                    <div class="step-guide-item">
+                        <div class="step-num">1</div>
+                        <div class="step-desc">
+                            <h4>Acquire Livestock Image</h4>
+                            <p>You can upload a photo (JPG, PNG, WEBP) from your device, drag and drop it into the dash, or click <strong>Live Camera</strong> to scan the animal in real-time using your webcam.</p>
+                        </div>
+                    </div>
+                    <div class="step-guide-item">
+                        <div class="step-num">2</div>
+                        <div class="step-desc">
+                            <h4>Analyze AI Feature Highlights</h4>
+                            <p>The system runs a deep Convolutional Neural Network (CNN) to detect the type of animal, gender, breed, and health condition. It will draw simulated bounding boxes indicating where the <strong>Horns</strong>, <strong>Facial structures</strong>, and <strong>Skin coats</strong> were detected.</p>
+                        </div>
+                    </div>
+                    <div class="step-guide-item">
+                        <div class="step-num">3</div>
+                        <div class="step-desc">
+                            <h4>Inspect Logits & Generate Reports</h4>
+                            <p>Look at the calculated logits (Horn Curvature, Melanin levels, etc.). Click <strong>Download PDF Report</strong> to save a clean, print-friendly analysis report. Past scans are automatically cached in the <strong>Scan History</strong> tab.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="btn-close-modal-ok">Got it, let's start!</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden canvas for resizing/processing -->
+    <canvas id="hidden-process-canvas" class="hidden"></canvas>
+    
+    <!-- Google Translate Element (Hidden) -->
+    <div id="google_translate_element" style="display: none;"></div>
+    <script type="text/javascript">
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({pageLanguage: 'en', autoDisplay: false}, 'google_translate_element');
+        }
+    </script>
+    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+
+    <!-- Script -->
+    <script src="app.js"></script>
+</body>
+</html>
