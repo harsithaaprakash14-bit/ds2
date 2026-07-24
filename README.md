@@ -1,6 +1,6 @@
-# Smart AI-Based Livestock Monitoring and Animal Classification System with Gender Detection
+# FarmVision AI — Intelligent Livestock Monitoring & Classification System
 
-An advanced artificial intelligence-powered system developed to identify, classify, and analyze cattle, buffaloes, and other animals using image processing, deep learning, and computer vision techniques.
+An advanced artificial intelligence-powered platform developed to identify, classify, and analyze cattle, buffaloes, and other animals using image processing, deep learning, and computer vision techniques.
 
 ## 🚀 Features
 
