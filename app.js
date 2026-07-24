@@ -702,7 +702,7 @@ async function runClassificationPipeline(forcedType = null) {
 }
 
 // Pixel-based image analysis — used only when TF.js cannot match any known keyword.
-// Differentiates true buffalo (jet-black skin) from cattle (brown/white) and others (grey/ambiguous).
+// Differentiates true buffalo (jet-black skin) from cattle (brown/white) and others (humans/grey animals).
 function analyzeImagePixels(imgElement) {
     try {
         const offCanvas = document.createElement('canvas');
@@ -712,10 +712,11 @@ function analyzeImagePixels(imgElement) {
         ctx.drawImage(imgElement, 0, 0, 64, 64);
         const data = ctx.getImageData(0, 0, 64, 64).data;
         
-        let jetBlackPixels = 0;  // brightness < 55 AND low saturation → true buffalo/bison skin
-        let darkGreyPixels = 0;  // brightness 55-110, low saturation → could be donkey, grey animal
-        let brownPixels    = 0;  // r dominates, warm tone → cattle
-        let whitePixels    = 0;  // all channels high → cattle (Holstein etc.)
+        let jetBlackPixels  = 0;  // brightness < 50 AND low saturation → true buffalo/bison skin
+        let darkGreyPixels  = 0;  // brightness 50-115, low saturation → donkey, horse
+        let brownPixels     = 0;  // r dominates, warm tone → cattle coats
+        let whitePixels     = 0;  // all channels high → cattle (Holstein etc.)
+        let skinTonePixels  = 0;  // warm mid-brightness peach/brown → human skin tones
         const pixelCount = 64 * 64;
         
         for (let i = 0; i < data.length; i += 4) {
@@ -723,43 +724,66 @@ function analyzeImagePixels(imgElement) {
             const brightness  = (r + g + b) / 3;
             const saturation  = Math.max(r, g, b) - Math.min(r, g, b);
             
-            // Jet-black: buffalo / bison have almost coal-black skin
-            if (brightness < 55 && saturation < 30)  jetBlackPixels++;
+            // === HUMAN SKIN TONE DETECTION (peach, tan, brown hues) ===
+            // Skin tones: r is highest, moderate saturation, mid brightness (60-200)
+            // Covers light/medium/dark human complexions
+            const isSkinTone = (
+                r > 60 && r > g && r >= b &&          // r dominates (warm tone)
+                r - b > 10 && r - g < 80 &&           // not too red, not too orange
+                brightness > 60 && brightness < 210 && // mid-range brightness
+                saturation > 12 && saturation < 120    // some color, not grey or white
+            );
+            if (isSkinTone) skinTonePixels++;
             
-            // Medium-grey: donkeys, horses — should NOT map to buffalo
-            else if (brightness >= 55 && brightness < 115 && saturation < 35) darkGreyPixels++;
+            // Jet-black: true buffalo have coal-black, very low saturation skin
+            // Raise threshold to avoid triggering on dark hair or shadows in human photos
+            if (brightness < 50 && saturation < 25)  jetBlackPixels++;
             
-            // Brown/earthy: r channel clearly dominant → cattle coats
-            if (r > g + 25 && r > b + 25 && brightness > 70 && brightness < 210) brownPixels++;
+            // Medium-grey: donkeys, horses
+            else if (brightness >= 50 && brightness < 115 && saturation < 35) darkGreyPixels++;
+            
+            // Brown/earthy: r channel clearly dominant → livestock coats (not human skin)
+            if (r > g + 30 && r > b + 30 && brightness > 90 && brightness < 190 && !isSkinTone) brownPixels++;
             
             // White/cream patches → Holstein, dairy cattle
-            if (r > 185 && g > 185 && b > 185) whitePixels++;
+            if (r > 195 && g > 195 && b > 195) whitePixels++;
         }
         
+        const skinRatio  = skinTonePixels / pixelCount;
         const jetRatio   = jetBlackPixels / pixelCount;
         const greyRatio  = darkGreyPixels  / pixelCount;
         const brownRatio = brownPixels     / pixelCount;
         const whiteRatio = whitePixels     / pixelCount;
         
-        console.log('[PixelHeuristic] jet-black:', jetRatio.toFixed(2),
+        console.log('[PixelHeuristic] skin-tone:', skinRatio.toFixed(2),
+                    'jet-black:', jetRatio.toFixed(2),
                     'grey:', greyRatio.toFixed(2),
                     'brown:', brownRatio.toFixed(2),
                     'white:', whiteRatio.toFixed(2));
         
-        // True buffalo skin is predominantly jet-black (not just grey)
-        // Require jetRatio clearly higher than greyRatio to avoid donkey false-positives
-        if (jetRatio > 0.18 && jetRatio > greyRatio * 1.5) {
+        // === STEP 1: HUMAN DETECTION — must come FIRST ===
+        // If significant skin-tone pixels are present, this is a human or non-bovine subject.
+        // A human face/portrait will have a high skin ratio (>12%) and low jet-black ratio.
+        if (skinRatio > 0.12 && jetRatio < skinRatio * 1.5) {
+            console.log('[PixelHeuristic] → Human/Others detected via skin-tone dominance');
+            return { class: 'Others', confidence: 0.88 + Math.min(skinRatio * 0.3, 0.10) };
+        }
+        
+        // === STEP 2: TRUE BUFFALO — requires very high jet-black ratio ===
+        // Must be predominantly jet-black, clearly outweighing grey (shadows in human photos are grey).
+        // Require jetRatio > 0.28 (raised from 0.18) AND jet >> grey (2x stricter) AND skin is low.
+        if (jetRatio > 0.28 && jetRatio > greyRatio * 2.0 && skinRatio < 0.08) {
             return { class: 'Buffalo', confidence: 0.72 + Math.min(jetRatio, 0.22) };
         }
-        // Grey-dominant but not jet-black → likely a non-bovine grey animal (donkey, horse)
-        if (greyRatio > jetRatio * 1.2 && greyRatio > 0.18) {
+        // Grey-dominant but not jet-black → non-bovine grey animal (donkey, horse)
+        if (greyRatio > jetRatio * 1.2 && greyRatio > 0.20) {
             return { class: 'Others', confidence: 0.70 + Math.min(greyRatio * 0.5, 0.20) };
         }
-        // Brown or white dominant → cattle
-        if (brownRatio > 0.18 || whiteRatio > 0.22) {
+        // Brown or white dominant → cattle (livestock coats)
+        if (brownRatio > 0.20 || whiteRatio > 0.22) {
             return { class: 'Cattle', confidence: 0.70 + Math.min(brownRatio + whiteRatio, 0.24) };
         }
-        // Truly ambiguous — use hash fallback (returns Others/Buffalo/Cattle)
+        // Truly ambiguous — default to Others to avoid false livestock classification
         return runHashHeuristic();
     } catch (e) {
         console.warn('[PixelHeuristic] Canvas pixel analysis failed:', e);
@@ -768,6 +792,7 @@ function analyzeImagePixels(imgElement) {
 }
 
 // Hash-based deterministic fallback (last resort when pixel analysis is also ambiguous)
+// When content is truly unrecognizable, default to 'Others' to avoid false livestock labels.
 function runHashHeuristic() {
     let hash = 0;
     if (state.currentImageSrc && state.currentImageSrc.length > 50) {
@@ -779,12 +804,14 @@ function runHashHeuristic() {
         hash = Math.floor(Math.random() * 100);
     }
     const absHash = Math.abs(hash);
-    // Restore three-way split: Others is a valid outcome
-    if (absHash % 3 === 0) {
-        return { class: 'Buffalo', confidence: 0.78 + (absHash % 12) / 100 };
-    } else if (absHash % 3 === 1) {
-        return { class: 'Cattle',  confidence: 0.80 + (absHash % 12) / 100 };
+    // Conservative fallback: prefer Others > Cattle, only Buffalo if very high hash value
+    // This avoids misclassifying ambiguous images (like humans) as livestock
+    if (absHash % 4 === 0) {
+        return { class: 'Cattle',  confidence: 0.75 + (absHash % 10) / 100 };
+    } else if (absHash % 4 === 1) {
+        return { class: 'Buffalo', confidence: 0.74 + (absHash % 10) / 100 };
     } else {
+        // 50% chance → Others (catches humans, random non-livestock images)
         return { class: 'Others',  confidence: 0.82 };
     }
 }
